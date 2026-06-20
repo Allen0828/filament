@@ -1016,6 +1016,7 @@ if (IS_HOST_PLATFORM)
     if (NOT WIN32)  # matedit not yet supported on Windows
         add_subdirectory(${TOOLS}/matedit)
     endif()
+    add_subdirectory(${TOOLS}/filament-editor)
     add_subdirectory(${TOOLS}/mipgen)
     add_subdirectory(${TOOLS}/normal-blending)
     add_subdirectory(${TOOLS}/resgen)
