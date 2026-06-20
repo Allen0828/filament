@@ -51,6 +51,7 @@ ImGuiHelper::ImGuiHelper(Engine* engine, filament::View* view, const Path& fontP
         : mEngine(engine), mView(view), mScene(engine->createScene()),
         mImGuiContext(imGuiContext ? imGuiContext : ImGui::CreateContext()) {
     ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     mSettingsPath.setPath(
             Path::getUserSettingsDirectory() +
             Path(std::string(".") + Path::getCurrentExecutable().getNameWithoutExtension()) +

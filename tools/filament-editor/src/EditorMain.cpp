@@ -118,11 +118,40 @@ int main(int argc, char** argv) {
         (void)engine;
         (void)view;
 
-        // Simple menu bar and sidebar layout (no docking)
-        ImGuiIO& io = ImGui::GetIO();
-        ImVec2 const displaySize = io.DisplaySize;
+        // Enable docking on first frame
+        static bool s_firstFrame = true;
+        if (s_firstFrame) {
+            ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+            s_firstFrame = false;
+        }
 
-        // Main menu bar
+        // Full-window dockspace
+        ImGuiViewport const* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(vp->WorkPos);
+        ImGui::SetNextWindowSize(vp->WorkSize);
+        ImGui::SetNextWindowViewport(vp->ID);
+
+        ImGuiWindowFlags const windowFlags =
+                ImGuiWindowFlags_MenuBar |
+                ImGuiWindowFlags_NoDocking |
+                ImGuiWindowFlags_NoTitleBar |
+                ImGuiWindowFlags_NoCollapse |
+                ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoBringToFrontOnFocus |
+                ImGuiWindowFlags_NoNavFocus;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+        ImGui::Begin("DockSpaceWindow", nullptr, windowFlags);
+        ImGui::PopStyleVar(3);
+
+        ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace");
+        ImGui::DockSpace(dockspaceId, ImVec2(0, 0),
+                ImGuiDockNodeFlags_PassthruCentralNode);
+
+        // Menu bar
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu("File")) {
                 if (ImGui::MenuItem("Exit")) {
@@ -144,17 +173,35 @@ int main(int argc, char** argv) {
             ImGui::EndMenuBar();
         }
 
-        float const sidebarWidth = 250.0f;
-        float const inspectorWidth = 250.0f;
-        float const bottomHeight = 150.0f;
+        ImGui::End();
 
-        // Hierarchy panel (left sidebar)
-        ImGui::SetNextWindowPos(ImVec2(0, io.DisplaySize.y * 0.05f));
-        ImGui::SetNextWindowSize(
-                ImVec2(sidebarWidth, displaySize.y - bottomHeight));
-        ImGui::Begin("##Hierarchy", nullptr,
-                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
-        ImGui::TextUnformatted("Hierarchy");
+        // Set up default docking layout on first frame
+        static bool s_layoutDone = false;
+        if (!s_layoutDone) {
+            s_layoutDone = true;
+
+            ImGui::DockBuilderRemoveNode(dockspaceId);
+            ImGui::DockBuilderAddNode(dockspaceId,
+                    ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderSetNodeSize(dockspaceId, vp->WorkSize);
+
+            ImGuiID dockLeft  = ImGui::DockBuilderSplitNode(dockspaceId,
+                    ImGuiDir_Left, 0.20f, nullptr, &dockspaceId);
+            ImGuiID dockRight = ImGui::DockBuilderSplitNode(dockspaceId,
+                    ImGuiDir_Right, 0.25f, nullptr, &dockspaceId);
+            ImGuiID dockBottom = ImGui::DockBuilderSplitNode(dockspaceId,
+                    ImGuiDir_Down, 0.25f, nullptr, &dockspaceId);
+
+            ImGui::DockBuilderDockWindow("Hierarchy", dockLeft);
+            ImGui::DockBuilderDockWindow("Viewport",  dockspaceId);
+            ImGui::DockBuilderDockWindow("Inspector", dockRight);
+            ImGui::DockBuilderDockWindow("Console",   dockBottom);
+            ImGui::DockBuilderFinish(dockspaceId);
+        }
+
+        // Hierarchy panel
+        ImGui::Begin("Hierarchy");
+        ImGui::TextUnformatted("Scene Entities");
         ImGui::Separator();
         {
             auto const& sel = editorCtx.getSelection();
@@ -168,28 +215,18 @@ int main(int argc, char** argv) {
         }
         ImGui::End();
 
-        // Viewport panel (center)
-        ImGui::SetNextWindowPos(
-                ImVec2(sidebarWidth, io.DisplaySize.y * 0.05f));
-        ImGui::SetNextWindowSize(ImVec2(displaySize.x - sidebarWidth
-                - inspectorWidth, displaySize.y - bottomHeight));
-        ImGui::Begin("##Viewport", nullptr,
-                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
-        ImGui::TextUnformatted("Viewport");
+        // Viewport panel
+        ImGui::Begin("Viewport");
+        ImGui::TextUnformatted("Scene Viewport");
         if (editorCtx.getMainView()) {
             auto const& vp = editorCtx.getMainView()->getViewport();
             ImGui::TextDisabled("%dx%d", (int)vp.width, (int)vp.height);
         }
         ImGui::End();
 
-        // Inspector panel (right sidebar)
-        ImGui::SetNextWindowPos(ImVec2(displaySize.x - inspectorWidth,
-                io.DisplaySize.y * 0.05f));
-        ImGui::SetNextWindowSize(
-                ImVec2(inspectorWidth, displaySize.y - bottomHeight));
-        ImGui::Begin("##Inspector", nullptr,
-                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
-        ImGui::TextUnformatted("Inspector");
+        // Inspector panel
+        ImGui::Begin("Inspector");
+        ImGui::TextUnformatted("Properties");
         ImGui::Separator();
         {
             auto primary = editorCtx.getSelection().getPrimary();
@@ -206,13 +243,9 @@ int main(int argc, char** argv) {
         }
         ImGui::End();
 
-        // Console panel (bottom)
-        ImGui::SetNextWindowPos(ImVec2(0, displaySize.y - bottomHeight));
-        ImGui::SetNextWindowSize(
-                ImVec2(displaySize.x, bottomHeight));
-        ImGui::Begin("##Console", nullptr,
-                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
-        ImGui::TextUnformatted("Console");
+        // Console panel
+        ImGui::Begin("Console");
+        ImGui::TextUnformatted("Output");
         ImGui::End();
     };
 
